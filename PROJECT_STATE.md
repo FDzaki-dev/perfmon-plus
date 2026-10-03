@@ -27,25 +27,27 @@
 - `versionName` app berbeda dari nomor batch ZIP/CHANGELOG pipeline.
 
 ## Peta Migrasi Kotlin (target: semua .java -> .kt, maks 3-5 file per batch)
-- Batch 5 (ZIP v5): toolchain Kotlin + Tools, Support, SharedPreferencesUtil -> .kt. [SELESAI ditulis, menunggu CI]
-- Batch 6: JniTools + RefreshingDateThread.
+- Batch 5 (ZIP v5): toolchain Kotlin + Tools, Support, SharedPreferencesUtil -> .kt. [CI build hijau, dilaporkan user]
+- Batch 6 (ZIP v6): JniTools (`object` + `@JvmStatic external`) + RefreshingDateThread (class + `companion object` dengan `@JvmField`, agar `import static` di FloatingWindow.java tetap valid). [SELESAI ditulis, menunggu CI]
 - Batch 7: FloatingWindow.
 - Batch 8: MainActivity.
 - Batch 9: Settings (file terbesar, sendiri).
 - Batch 10: ExampleInstrumentedTest + ExampleUnitTest (opsional).
 - Aturan kompatibilitas selama campuran Java/Kotlin: class Kotlin yang diakses Java memakai `object` + `@JvmStatic`/`@JvmField`/`const val` agar nama static tidak berubah; hindari `internal` (nama JVM di-mangle). `lateinit var` tidak boleh digabung `@JvmField`.
 
-## Rencana Fitur Overclock CPU (BELUM dimulai, belum disetujui detailnya)
-- Syarat: perangkat root. Jawaban user soal status root/kernel/SoC masih ditunggu.
-- Batas teknis: aplikasi hanya bisa memilih frekuensi yang diekspos kernel (`scaling_available_frequencies`); melampaui batas stok butuh kernel custom.
-- Rancangan awal: preset berbasis persentase dari rentang frekuensi tersedia (bukan angka hardcode), snapshot nilai asli untuk tombol kembali ke stock, eksekusi root di `Dispatchers.IO` dengan path/nilai tervalidasi (whitelist), tanpa watchdog/foreground service abadi (guard), apply-on-boot hanya jika opt-in.
-- Dikerjakan SETELAH migrasi cukup maju, ditulis langsung dalam Kotlin.
+## Rencana Fitur Overclock CPU (BELUM dimulai; menunggu pilihan user)
+- Status perangkat (dari user): non-root murni; user berharap overclock bisa lewat Shizuku.
+- Temuan teknis (analisis, BELUM diuji di perangkat user): Shizuku memberi UID shell (2000), bukan root. Node `scaling_max_freq`/`scaling_min_freq`/`scaling_governor` di sysfs cpufreq pada perangkat stok umumnya milik root (0644) dan dilindungi SELinux, jadi tidak writable oleh shell. Maka mengubah/menaikkan frekuensi CPU via Shizuku diperkirakan GAGAL. Batas frekuensi di atas tabel OPP kernel (overclock sungguhan) tetap butuh kernel custom, dengan atau tanpa root.
+- Uji verifikasi (read-only, aman): jalankan `rish -c 'ls -l /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq'`; owner root + tanpa izin tulis untuk shell = terkonfirmasi tidak bisa.
+- Opsi yang realistis (pilih salah satu; jangan menulis kode Shizuku sebelum dipilih): (A) tombol "boost" level-hint via Shizuku (Game Mode / fixed performance mode; efek bergantung vendor, BUKAN overclock); (B) Shizuku untuk MONITOR (baca node sysfs yang diblokir SELinux untuk aplikasi biasa); (C) tunda fitur overclock, fokus migrasi Kotlin.
+- Dampak integrasi Shizuku bila dipilih: Shizuku-API menurut dokumentasinya butuh minSdk 23 (proyek saat ini 21; verifikasi saat dikerjakan; perubahan minSdk butuh persetujuan user). Kompatibilitas dengan AGP 4.0.1 / Kotlin 1.4.32 belum diverifikasi.
+- Rancangan umum bila lanjut: preset berbasis persentase dari frekuensi tersedia, snapshot nilai asli untuk tombol kembali ke stock, eksekusi di `Dispatchers.IO`, whitelist path/nilai, tanpa watchdog/foreground service abadi, apply-on-boot hanya opt-in. Ditulis langsung dalam Kotlin.
 
 ## Status Verifikasi
-- Terbukti (dilaporkan user): build di runner GitHub dan `release.yml` berjalan sampai publish; APK rilis berhasil diinstal di perangkat (masalah "paket bentrok" selesai).
+- Terbukti (dilaporkan user): build di runner GitHub dan `release.yml` berjalan sampai publish; APK rilis berhasil diinstal di perangkat (masalah "paket bentrok" selesai). CI build.yml hijau untuk Batch 5.
 - BELUM terverifikasi: perilaku fitur aplikasi di perangkat (user belum melaporkan).
-- Batch 5 BELUM dikompilasi (kotlinc/Gradle tidak ada di lingkungan pembuat ZIP); verifikasi lewat CI setelah push. Tidak ada klaim build hijau untuk Batch 5.
+- Batch 6 BELUM dikompilasi (kotlinc/Gradle tidak ada di lingkungan pembuat ZIP); verifikasi lewat CI setelah push. Tidak ada klaim build hijau untuk Batch 6.
 - Lint/detekt/pre-commit belum ada (detekt hanya untuk Kotlin; relevan setelah migrasi).
 
 ## [RESUME POINT]
-[KOTLIN_MIGRATION_BATCH_5] -> [Toolchain Kotlin 1.4.32 + `mavenCentral()` ditambahkan; Tools, Support, SharedPreferencesUtil dikonversi ke .kt (paritas perilaku, API static Java dipertahankan); belum dikompilasi, belum dibuild CI] -> [Setelah DAILY UPDATE ter-push, cek CI build.yml. Jika merah: baca error step Gradle dan perbaiki hanya di file Batch 5 (kandidat: akses Java ke field/fungsi object Kotlin, versi KGP vs Gradle 6.1.1). Jika hijau: Batch 6 = JniTools (`@JvmStatic external`) + RefreshingDateThread. Overclock menunggu jawaban user: apakah HP sudah root]
+[KOTLIN_MIGRATION_BATCH_6 + OVERCLOCK_VIA_SHIZUKU] -> [Batch 5 CI hijau (dilaporkan user). JniTools.kt dan RefreshingDateThread.kt menggantikan versi Java (parity perilaku; JniTools = object + @JvmStatic external, RefreshingDateThread = companion @JvmField); belum dikompilasi, belum dibuild CI. User non-root murni dan minta overclock via Shizuku: analisis teknis menyatakan shell UID tidak bisa menulis sysfs cpufreq (belum diuji di perangkat); fitur overclock BELUM dimulai, tidak ada kode Shizuku] -> [Setelah DAILY UPDATE ter-push, cek CI build.yml. Jika merah: perbaiki hanya di JniTools.kt/RefreshingDateThread.kt (kandidat: akses Java ke field companion, nama symbol JNI static, field/Handler package-private FloatingWindow). Jika hijau: Batch 7 = FloatingWindow. Overclock: tunggu pilihan user (A boost level-hint, B Shizuku untuk monitor, C tunda); jangan menulis kode Shizuku sebelum dipilih]

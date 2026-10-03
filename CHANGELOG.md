@@ -1,5 +1,11 @@
 # Changelog
 
+## v6 — 2026-10-03
+- Migrasi Kotlin Batch 6: `JniTools` (`object` + `@JvmStatic external`, symbol JNI tidak berubah) dan `RefreshingDateThread` (class + `companion object` `@JvmField`, static import di `FloatingWindow.java` tetap valid) dari Java ke Kotlin, perilaku sama.
+- Catat status overclock di `PROJECT_STATE.md`: perangkat user non-root; Shizuku (UID shell) diperkirakan tidak bisa menulis sysfs cpufreq; opsi A/B/C menunggu pilihan user. Tidak ada kode overclock/Shizuku ditambahkan.
+- File Java lain, JNI (C), workflow, dan package identity (`xzr.perfmon`) tidak diubah.
+- Belum dikompilasi lokal; verifikasi lewat CI.
+
 ## v5 — 2026-10-03
 - Migrasi Kotlin Batch 1: tambah toolchain Kotlin 1.4.32 (`kotlin-android`, stdlib, jvmTarget 1.8, Java 8 compileOptions) dan `mavenCentral()`.
 - Konversi `Tools`, `Support`, `SharedPreferencesUtil` dari Java ke Kotlin (`object`, API static untuk caller Java dipertahankan).
