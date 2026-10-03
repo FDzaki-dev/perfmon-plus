@@ -1,5 +1,11 @@
 # Changelog
 
+## v5 — 2026-10-03
+- Migrasi Kotlin Batch 1: tambah toolchain Kotlin 1.4.32 (`kotlin-android`, stdlib, jvmTarget 1.8, Java 8 compileOptions) dan `mavenCentral()`.
+- Konversi `Tools`, `Support`, `SharedPreferencesUtil` dari Java ke Kotlin (`object`, API static untuk caller Java dipertahankan).
+- File Java lain, JNI, workflow, dan package identity (`xzr.perfmon`) tidak diubah.
+- Belum dikompilasi lokal; verifikasi lewat CI.
+
 ## v4 — 2026-10-03
 - Tambah `.github/workflows/release.yml`: rilis GitHub otomatis dari tag semver (`v1.7.1`, `v1.8.0-beta.1`).
 - Gate rilis: tag harus sama dengan `versionName`, commit harus ada di `main`, semua secret signing wajib ada, signature APK diverifikasi dengan `apksigner`.
