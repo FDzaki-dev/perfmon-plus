@@ -7,4 +7,3 @@ app/.cxx/
 /build
 /captures
 .externalNativeBuild
-release.keystore
