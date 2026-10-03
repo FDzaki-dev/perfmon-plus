@@ -1,5 +1,11 @@
 # Changelog
 
+## v8 — 2026-10-03
+- Migrasi Kotlin Batch 8: `MainActivity` dari Java ke Kotlin. Baris status dukungan diringkas lewat helper, eksekusi `su` (setenforce) digabung jadi satu fungsi; urutan UI, teks, dan perilaku tombol sama. `Settings.creatDialog` (Java) tetap dipanggil, `android.provider.Settings` ditulis fully-qualified.
+- Catat keputusan user di `PROJECT_STATE.md`: tuntaskan migrasi dulu, lalu fitur opsi A (boost via Shizuku). Tidak ada kode Shizuku/overclock ditambahkan.
+- File Java lain (`Settings.java`), JNI (C), workflow, dan package identity (`xzr.perfmon`) tidak diubah.
+- Belum dikompilasi lokal; verifikasi lewat CI.
+
 ## v7 — 2026-10-03
 - Migrasi Kotlin Batch 7: `FloatingWindow` (Service overlay) dari Java ke Kotlin. State static dipindah ke `companion object` dengan `@JvmField` (`do_exit`, `linen`, `show_*_now`) agar `MainActivity.java` dan `RefreshingDateThread.kt` tetap kompatibel; perilaku UI sama.
 - `RefreshingDateThread.kt`: `sleep` diganti `Thread.sleep` (eksplisit, tanpa mengubah perilaku).
