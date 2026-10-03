@@ -28,8 +28,8 @@
 
 ## Peta Migrasi Kotlin (target: semua .java -> .kt, maks 3-5 file per batch)
 - Batch 5 (ZIP v5): toolchain Kotlin + Tools, Support, SharedPreferencesUtil -> .kt. [CI build hijau, dilaporkan user]
-- Batch 6 (ZIP v6): JniTools (`object` + `@JvmStatic external`) + RefreshingDateThread (class + `companion object` dengan `@JvmField`, agar `import static` di FloatingWindow.java tetap valid). [SELESAI ditulis, menunggu CI]
-- Batch 7: FloatingWindow.
+- Batch 6 (ZIP v6): JniTools (`object` + `@JvmStatic external`) + RefreshingDateThread (class + `companion object` dengan `@JvmField`, agar `import static` di FloatingWindow.java tetap valid). [Ditulis; user lanjut dengan "Next", hasil CI v6 tidak dilaporkan eksplisit]
+- Batch 7 (ZIP v7): FloatingWindow (Service; state static -> `companion object` `@JvmField` supaya `FloatingWindow.do_exit`/`linen` dari MainActivity.java tetap valid) + hardening `Thread.sleep` di RefreshingDateThread.kt. [SELESAI ditulis, menunggu CI]
 - Batch 8: MainActivity.
 - Batch 9: Settings (file terbesar, sendiri).
 - Batch 10: ExampleInstrumentedTest + ExampleUnitTest (opsional).
@@ -46,8 +46,8 @@
 ## Status Verifikasi
 - Terbukti (dilaporkan user): build di runner GitHub dan `release.yml` berjalan sampai publish; APK rilis berhasil diinstal di perangkat (masalah "paket bentrok" selesai). CI build.yml hijau untuk Batch 5.
 - BELUM terverifikasi: perilaku fitur aplikasi di perangkat (user belum melaporkan).
-- Batch 6 BELUM dikompilasi (kotlinc/Gradle tidak ada di lingkungan pembuat ZIP); verifikasi lewat CI setelah push. Tidak ada klaim build hijau untuk Batch 6.
+- Batch 6 dan 7 BELUM dikompilasi di lingkungan pembuat ZIP (kotlinc/Gradle tidak ada); verifikasi lewat CI setelah push. Tidak ada klaim build hijau untuk Batch 6 maupun 7.
 - Lint/detekt/pre-commit belum ada (detekt hanya untuk Kotlin; relevan setelah migrasi).
 
 ## [RESUME POINT]
-[KOTLIN_MIGRATION_BATCH_6 + OVERCLOCK_VIA_SHIZUKU] -> [Batch 5 CI hijau (dilaporkan user). JniTools.kt dan RefreshingDateThread.kt menggantikan versi Java (parity perilaku; JniTools = object + @JvmStatic external, RefreshingDateThread = companion @JvmField); belum dikompilasi, belum dibuild CI. User non-root murni dan minta overclock via Shizuku: analisis teknis menyatakan shell UID tidak bisa menulis sysfs cpufreq (belum diuji di perangkat); fitur overclock BELUM dimulai, tidak ada kode Shizuku] -> [Setelah DAILY UPDATE ter-push, cek CI build.yml. Jika merah: perbaiki hanya di JniTools.kt/RefreshingDateThread.kt (kandidat: akses Java ke field companion, nama symbol JNI static, field/Handler package-private FloatingWindow). Jika hijau: Batch 7 = FloatingWindow. Overclock: tunggu pilihan user (A boost level-hint, B Shizuku untuk monitor, C tunda); jangan menulis kode Shizuku sebelum dipilih]
+[KOTLIN_MIGRATION_BATCH_7 + OVERCLOCK_VIA_SHIZUKU] -> [Batch 7: FloatingWindow.kt menggantikan FloatingWindow.java (paritas perilaku; companion @JvmField untuk do_exit, linen, show_*_now; fungsi init/monitor_init dinamai ulang initWindow/initMonitor; Handler pakai Looper.getMainLooper(); refresh teks dipisah ke updateLines()). RefreshingDateThread.kt: sleep -> Thread.sleep. Belum dikompilasi, belum dibuild CI; CI v6 tidak dilaporkan eksplisit. Overclock: user non-root, analisis teknis menyatakan shell UID tidak bisa menulis sysfs cpufreq (belum diuji di perangkat); fitur overclock BELUM dimulai, tidak ada kode Shizuku] -> [Setelah DAILY UPDATE ter-push, cek CI build.yml. Jika merah: perbaiki hanya di FloatingWindow.kt/RefreshingDateThread.kt/JniTools.kt (kandidat: akses Java ke companion field dari MainActivity.java, lateinit companion, nullability array cpufreq/cpuload/cpuonline). Jika hijau: Batch 8 = MainActivity. Overclock: tunggu pilihan user (A boost level-hint, B Shizuku untuk monitor, C tunda); jangan menulis kode Shizuku sebelum dipilih]

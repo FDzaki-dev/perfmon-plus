@@ -1,5 +1,11 @@
 # Changelog
 
+## v7 — 2026-10-03
+- Migrasi Kotlin Batch 7: `FloatingWindow` (Service overlay) dari Java ke Kotlin. State static dipindah ke `companion object` dengan `@JvmField` (`do_exit`, `linen`, `show_*_now`) agar `MainActivity.java` dan `RefreshingDateThread.kt` tetap kompatibel; perilaku UI sama.
+- `RefreshingDateThread.kt`: `sleep` diganti `Thread.sleep` (eksplisit, tanpa mengubah perilaku).
+- Tidak ada fitur overclock/Shizuku ditambahkan. File Java lain, JNI (C), workflow, dan package identity (`xzr.perfmon`) tidak diubah.
+- Belum dikompilasi lokal; verifikasi lewat CI.
+
 ## v6 — 2026-10-03
 - Migrasi Kotlin Batch 6: `JniTools` (`object` + `@JvmStatic external`, symbol JNI tidak berubah) dan `RefreshingDateThread` (class + `companion object` `@JvmField`, static import di `FloatingWindow.java` tetap valid) dari Java ke Kotlin, perilaku sama.
 - Catat status overclock di `PROJECT_STATE.md`: perangkat user non-root; Shizuku (UID shell) diperkirakan tidak bisa menulis sysfs cpufreq; opsi A/B/C menunggu pilihan user. Tidak ada kode overclock/Shizuku ditambahkan.

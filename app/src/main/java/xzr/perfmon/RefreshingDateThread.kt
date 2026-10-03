@@ -66,7 +66,7 @@ class RefreshingDateThread : Thread() {
                 }
             }
             try {
-                sleep(delay.toLong())
+                Thread.sleep(delay.toLong())
             } catch (e: Exception) {
                 // paritas perilaku Java: exception sleep diabaikan
             }
