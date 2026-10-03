@@ -29,6 +29,12 @@ android {
                 signingConfig signingConfigs.release
             }
         }
+        debug {
+            // Key debug runner CI berubah tiap run; samakan dengan release agar semua APK CI satu signature.
+            if (System.getenv("KEYSTORE_PATH")) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
     externalNativeBuild {
         ndkBuild {
