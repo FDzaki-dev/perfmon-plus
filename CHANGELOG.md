@@ -1,5 +1,12 @@
 # Changelog
 
+## v4 — 2026-10-03
+- Tambah `.github/workflows/release.yml`: rilis GitHub otomatis dari tag semver (`v1.7.1`, `v1.8.0-beta.1`).
+- Gate rilis: tag harus sama dengan `versionName`, commit harus ada di `main`, semua secret signing wajib ada, signature APK diverifikasi dengan `apksigner`.
+- Aset rilis `PerfMon-Plus-v<versi>.apk` + checksum SHA-256; release notes dari riwayat commit; tag dengan `-` ditandai prerelease.
+- Job `publish` dipisah (satu-satunya yang punya `contents: write`, tanpa akses secret signing).
+- Source aplikasi, `build.yml`, dan package identity (`xzr.perfmon`) tidak diubah.
+
 ## v3 — 2026-10-03
 - Fix install "paket bentrok": buildType `debug` ikut ditandatangani keystore CI (env `KEYSTORE_PATH`) agar APK debug dan release satu signature dan kompatibel antar-run.
 - Source aplikasi, workflow, dan package identity (`xzr.perfmon`) tidak diubah.

@@ -1,0 +1,208 @@
+name: Release
+
+# Rilis dipicu oleh push tag semver: v1.7.1, v1.8.0-beta.1, dst.
+# Tag HARUS sama dengan versionName di app/build.gradle dan commit-nya harus ada di main.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build signed APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag, versionName and branch
+        id: meta
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Format tag tidak valid: $TAG (contoh: v1.7.1 atau v1.8.0-beta.1)"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          GRADLE_VERSION="$(grep -E '^[[:space:]]*versionName[[:space:]]' app/build.gradle | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')"
+          if [ "$VERSION" != "$GRADLE_VERSION" ]; then
+            echo "::error::Tag $TAG tidak cocok dengan versionName di app/build.gradle ($GRADLE_VERSION)."
+            exit 1
+          fi
+          COMMIT="$(git rev-parse "${GITHUB_REF}^{commit}")"
+          if ! git merge-base --is-ancestor "$COMMIT" origin/main; then
+            echo "::error::Commit untuk tag $TAG tidak ada di branch main."
+            exit 1
+          fi
+          PRERELEASE=false
+          case "$TAG" in
+            *-*) PRERELEASE=true ;;
+          esac
+          {
+            echo "version=$VERSION"
+            echo "prerelease=$PRERELEASE"
+            echo "commit=$COMMIT"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for NAME in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!NAME}" ]; then
+              echo "::error::Secret $NAME belum di-set. Rilis tidak boleh unsigned; jalankan BOX B terlebih dahulu."
+              exit 1
+            fi
+          done
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      # Sebelum setup-java: sdkmanager butuh JDK default runner (17), bukan JDK 11.
+      - name: Install Android SDK components
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-30" "build-tools;29.0.2" "ndk;21.3.6528147"
+
+      - name: Setup JDK 11
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: gradle
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Verify APK signature
+        run: |
+          APK="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK" ]; then
+            echo "::error::APK release tidak ditemukan: $APK"
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/29.0.2/apksigner" verify --verbose --print-certs "$APK"
+
+      - name: Package assets and release notes
+        env:
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          COMMIT: ${{ steps.meta.outputs.commit }}
+          REPO: ${{ github.repository }}
+        run: |
+          APK="PerfMon-Plus-v${VERSION}.apk"
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/${APK}"
+          (cd dist && sha256sum "${APK}" > "${APK}.sha256")
+          SHA="$(cut -d' ' -f1 "dist/${APK}.sha256")"
+
+          PREV="$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${COMMIT}^" 2>/dev/null || true)"
+
+          cat > dist/RELEASE_NOTES.md << EOF
+          ## PerfMon+ ${TAG}
+
+          Monitor performa Android sederhana.
+
+          ### Unduh
+          - ${APK} (Android 5.0+ / API 21)
+          - ${APK}.sha256 (checksum SHA-256)
+
+          ### Verifikasi
+          SHA-256: ${SHA}
+
+              sha256sum -c ${APK}.sha256
+
+          ### Catatan instal
+          APK ditandatangani dengan keystore rilis proyek. Jika Android menolak instal dengan pesan "paket bentrok", uninstall PerfMon+ lama (signature berbeda) lalu instal ulang.
+
+          ### Perubahan
+          EOF
+
+          if [ -n "$PREV" ]; then
+            RANGE="${PREV}..${COMMIT}"
+          else
+            RANGE="${COMMIT}"
+          fi
+          LOG="$(git log --no-merges --pretty='- %s (%h)' "$RANGE")"
+          if [ -z "$LOG" ]; then
+            LOG="- Tidak ada perubahan commit sejak rilis sebelumnya."
+          fi
+          {
+            echo "$LOG"
+            echo
+            if [ -n "$PREV" ]; then
+              echo "Full Changelog: https://github.com/${REPO}/compare/${PREV}...${TAG}"
+            else
+              echo "Full Changelog: https://github.com/${REPO}/commits/${TAG}"
+            fi
+          } >> dist/RELEASE_NOTES.md
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Job terpisah: hanya job ini yang memegang izin tulis (contents: write)
+  # dan TIDAK menjalankan kode build maupun membaca secret signing.
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease }}
+        run: |
+          APK="PerfMon-Plus-v${VERSION}.apk"
+          PRE=""
+          if [ "$PRERELEASE" = "true" ]; then
+            PRE="--prerelease"
+          fi
+          gh release create "$TAG" "dist/${APK}" "dist/${APK}.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "PerfMon+ ${TAG}" \
+            --notes-file dist/RELEASE_NOTES.md \
+            $PRE
